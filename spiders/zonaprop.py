@@ -38,13 +38,15 @@ class ZonapropSpider(scrapy.Spider):
     def parse_prop(self, response):
         prop_item = PropItem()
         prop_item["url"] = response.url
-        prop_item["title"] = response.xpath('//hgroup[has-class("title-container")]/div/h1/text()').extract_first(default="")
-        prop_item["direction"] = response.xpath('//hgroup[has-class("title-container")]/h2/text()').extract_first(default="")\
+        prop_item["title"] = response.xpath('//hgroup[has-class("title-container")]/div/h1/text()')\
+            .extract_first(default="").replace("\n", "")
+        full_address = response.xpath('//div[has-class("section-location-property")]/h4/text()').extract_first(default="")\
             .replace("\n", "")
-        location = response.xpath('//hgroup[has-class("title-container")]/h2/span/text()').extract_first(default="")
+        address, location = "", ""
         try:
-            low_location = location.split(",")[1].strip()
-            big_location = location.split(",")[2].strip()
+            address = full_address.split(",")[0].strip()
+            low_location = full_address.split(",")[1].strip()
+            big_location = full_address.split(",")[2].strip()
             if big_location == "Capital Federal":
                 location = low_location.lower()
             else:
@@ -52,15 +54,17 @@ class ZonapropSpider(scrapy.Spider):
         except Exception as e:
             self.logger.error(e)
         prop_item["location"] = location
-        price = response.xpath('//div[has-class("price-items")]/span/span/text()').extract_first(default="s n").strip()\
+        prop_item["direction"] = address
+        price = response.xpath('//div[has-class("price-value")]/span/span/text()').extract_first(default="s n").strip()\
             .split(" ")
         prop_item["price"] = price[1].replace(".", "")
         if prop_item["price"] == "precio":
             prop_item["price"] = 0
         prop_item["currency"] = price[0]
-        prop_item["expens"] = response.xpath("//div[has-class('block-expensas')]/span/text()")\
-            .extract_first(default="").replace("$", "")
-        if not prop_item["expens"]:
+        try:
+            prop_item["expens"] = response.xpath("//div[has-class('price-extra')]/span/text()")\
+                .extract_first(default="0").strip().split(" ")[-1].replace("$", "")
+        except Exception:
             prop_item["expens"] = 0
         props = response.xpath("//ul[has-class('section-icon-features')]/li")
         for prop in props:
